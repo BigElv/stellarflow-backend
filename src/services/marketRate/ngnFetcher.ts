@@ -3,6 +3,7 @@ import { OUTGOING_HTTP_TIMEOUT_MS } from "../../utils/httpTimeout.js";
 import {
   MarketRateFetcher,
   MarketRate,
+  RawApiResponse,
   calculateWeightedAverage,
   filterOutliers,
 } from "./types";
@@ -100,6 +101,7 @@ export class NGNRateFetcher implements MarketRateFetcher {
   private async fetchNgnPerUsdFromVtpass(): Promise<{
     ngnPerUsd: number;
     timestamp: Date;
+    rawResponse: VtpassVariationsResponse;
   } | null> {
     const serviceId = process.env.VTPASS_NGN_SERVICE_ID?.trim();
     const variationCode = process.env.VTPASS_NGN_VARIATION_CODE?.trim();
@@ -137,15 +139,27 @@ export class NGNRateFetcher implements MarketRateFetcher {
     const ngnPerUsd = rateFromField ?? amount;
     if (ngnPerUsd == null) return null;
 
-    return { ngnPerUsd, timestamp: new Date() };
+    return {
+      ngnPerUsd,
+      timestamp: new Date(),
+      rawResponse: response.data,
+    };
   }
 
   async fetchRate(): Promise<MarketRate> {
     const prices: NGNPriceCandidate[] = [];
+    const rawResponses: RawApiResponse[] = [];
 
     try {
       const vt = await this.fetchNgnPerUsdFromVtpass();
       if (vt) {
+        rawResponses.push({
+          provider: "VTpass",
+          endpoint: `${this.vtpassBase()}/service-variations`,
+          payload: vt.rawResponse,
+          receivedAt: new Date(),
+        });
+
         const coinGeckoResponse = await withRetry(
           () =>
             axios.get<CoinGeckoPriceResponse>(this.coinGeckoUrl, {
@@ -156,6 +170,13 @@ export class NGNRateFetcher implements MarketRateFetcher {
             }),
           { maxRetries: 3, retryDelay: 1000 },
         );
+
+          rawResponses.push({
+            provider: "CoinGecko",
+            endpoint: this.coinGeckoUrl,
+            payload: coinGeckoResponse.data,
+            receivedAt: new Date(),
+          });
 
         const usd = coinGeckoResponse.data.stellar?.usd;
         if (typeof usd === "number" && usd > 0) {
@@ -188,6 +209,13 @@ export class NGNRateFetcher implements MarketRateFetcher {
           }),
         { maxRetries: 3, retryDelay: 1000 },
       );
+
+      rawResponses.push({
+        provider: "CoinGecko",
+        endpoint: this.coinGeckoUrl,
+        payload: coinGeckoResponse.data,
+        receivedAt: new Date(),
+      });
 
       const stellarPrice = coinGeckoResponse.data.stellar;
       if (
@@ -222,6 +250,13 @@ export class NGNRateFetcher implements MarketRateFetcher {
         { maxRetries: 3, retryDelay: 1000 },
       );
 
+      rawResponses.push({
+        provider: "CoinGecko",
+        endpoint: this.coinGeckoUrl,
+        payload: coinGeckoResponse.data,
+        receivedAt: new Date(),
+      });
+
       const stellarPrice = coinGeckoResponse.data.stellar;
       if (
         stellarPrice &&
@@ -238,6 +273,13 @@ export class NGNRateFetcher implements MarketRateFetcher {
             }),
           { maxRetries: 3, retryDelay: 1000 },
         );
+
+        rawResponses.push({
+          provider: "ExchangeRate API",
+          endpoint: this.usdToNgnUrl,
+          payload: fxResponse.data,
+          receivedAt: new Date(),
+        });
 
         const usdToNgn = fxResponse.data.rates?.NGN;
         if (
@@ -300,6 +342,7 @@ export class NGNRateFetcher implements MarketRateFetcher {
       rate: weightedRate,
       timestamp: mostRecentTimestamp,
       source: `Weighted average of ${pricesToUse.length} sources (outliers filtered)`,
+      rawResponses,
     };
   }
 
