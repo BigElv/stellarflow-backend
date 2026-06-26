@@ -26,16 +26,16 @@ async function logAuditEvent(event: {
       data: {
         id: generateKsuid(),
         eventType: event.eventType,
-        actionType: event.actionType,
-        relatedId: event.relatedId,
+        actionType: event.actionType ?? null,
+        relatedId: event.relatedId ?? null,
         actorPublicKey: event.actorPublicKey,
         actorName: event.actorName,
-        actorRole: event.actorRole,
-        eventDetails: event.eventDetails,
-        previousState: event.previousState,
-        newState: event.newState,
-        ipAddress: event.ipAddress,
-        userAgent: event.userAgent,
+        actorRole: event.actorRole ?? null,
+        eventDetails: event.eventDetails ?? null,
+        previousState: event.previousState ?? null,
+        newState: event.newState ?? null,
+        ipAddress: event.ipAddress ?? null,
+        userAgent: event.userAgent ?? null,
         occurredAt: new Date(),
       },
     });
@@ -96,7 +96,7 @@ export const getRelayerRegistry = async (req: Request, res: Response) => {
  */
 export const getRelayerRegistryById = async (req: Request, res: Response) => {
   try {
-    const relayerId = parseInt(req.params.relayerId);
+    const relayerId = parseInt(req.params.relayerId as string);
 
     if (isNaN(relayerId)) {
       return sendApiError(res, 400, "BAD_REQUEST", "Invalid relayer ID");
@@ -208,7 +208,7 @@ export const upsertRelayerRegistry = async (req: Request, res: Response) => {
         contactName: existing.contactName,
         email: existing.email,
         organizationName: existing.organizationName,
-      }) : null,
+      }) : undefined,
       newState: JSON.stringify({
         contactName: registry.contactName,
         email: registry.email,
@@ -235,7 +235,7 @@ export const upsertRelayerRegistry = async (req: Request, res: Response) => {
  */
 export const deleteRelayerRegistry = async (req: Request, res: Response) => {
   try {
-    const relayerId = parseInt(req.params.relayerId);
+    const relayerId = parseInt(req.params.relayerId as string);
 
     if (isNaN(relayerId)) {
       return sendApiError(res, 400, "BAD_REQUEST", "Invalid relayer ID");
@@ -273,7 +273,7 @@ export const deleteRelayerRegistry = async (req: Request, res: Response) => {
         email: existing.email,
         organizationName: existing.organizationName,
       }),
-      newState: null,
+      newState: undefined,
       ipAddress: adminInfo.ipAddress,
       userAgent: adminInfo.userAgent,
     });

@@ -15,10 +15,7 @@ if (
   transports.push(
     new HttpLogTransport({
       level: 'info',
-      name: 'http-log-transport',
-      stderrLevels: [],
-      eol: '\n',
-    }),
+    }) as any,
   );
 }
 
